@@ -112,7 +112,8 @@ func (s *Server) handleListCertificates(w http.ResponseWriter, r *http.Request) 
 func (s *Server) handleAddCertificate(w http.ResponseWriter, r *http.Request) {
 	var req models.AddCertRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondError(w, http.StatusBadRequest, fmt.Sprintf("invalid request body: %v", err))
+		s.logger.Warn("add certificate: malformed request body", "error", err)
+		respondError(w, http.StatusBadRequest, "malformed request body")
 		return
 	}
 	if req.Domain == "" {
@@ -214,7 +215,8 @@ func (s *Server) handleListPolicies(w http.ResponseWriter, _ *http.Request) {
 func (s *Server) handleCreatePolicy(w http.ResponseWriter, r *http.Request) {
 	var req models.CreatePolicyRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondError(w, http.StatusBadRequest, fmt.Sprintf("invalid request body: %v", err))
+		s.logger.Warn("create policy: malformed request body", "error", err)
+		respondError(w, http.StatusBadRequest, "malformed request body")
 		return
 	}
 	if req.Name == "" {

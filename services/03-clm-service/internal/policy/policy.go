@@ -65,7 +65,7 @@ func (e *Engine) Evaluate() []EvaluationResult {
 
 // evaluateCert decides whether a single certificate needs rotation.
 func (e *Engine) evaluateCert(cert *models.Certificate, now time.Time) EvaluationResult {
-	daysUntilExpiry := int(time.Until(cert.ExpiresAt).Hours() / 24)
+	daysUntilExpiry := int(cert.ExpiresAt.Sub(now).Hours() / 24)
 	result := EvaluationResult{
 		CertID:          cert.ID,
 		Domain:          cert.Domain,
