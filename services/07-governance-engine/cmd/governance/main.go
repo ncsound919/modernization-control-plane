@@ -13,7 +13,7 @@ func main() {
 	port := envOr("PORT", "8080")
 	// POSTGRES_DSN and KAFKA_BROKERS are logged for observability; they will be
 	// wired into PostgreSQL / Kafka clients when those integrations are added.
-	postgresDSN := envOr("POSTGRES_DSN", "postgres://mcp:mcp_dev_password@localhost:5432/mcp")
+	postgresDSN := envOr("POSTGRES_DSN", "postgres://localhost:5432/mcp")
 	kafkaBrokers := envOr("KAFKA_BROKERS", "localhost:9092")
 
 	log.Printf("governance-engine starting")
