@@ -1,0 +1,180 @@
+# Modernization Control Plane - Local Development Stack
+# Run: docker compose up -d
+
+services:
+
+  # ==================== INFRASTRUCTURE ====================
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: mcp-postgres
+    environment:
+      POSTGRES_USER: mcp
+      POSTGRES_PASSWORD: mcp_dev_password
+      POSTGRES_DB: mcp
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mcp"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: mcp-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  neo4j:
+    image: neo4j:5.18-community
+    container_name: mcp-neo4j
+    environment:
+      NEO4J_AUTH: neo4j/mcp_dev_password
+      NEO4J_PLUGINS: '["apoc"]'
+    ports:
+      - "7474:7474"  # Browser UI
+      - "7687:7687"  # Bolt protocol
+    volumes:
+      - neo4j_data:/data
+    healthcheck:
+      test: ["CMD", "cypher-shell", "-u", "neo4j", "-p", "mcp_dev_password", "RETURN 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+
+  kafka:
+    image: confluentinc/cp-kafka:7.6.0
+    container_name: mcp-kafka
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    ports:
+      - "9092:9092"
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.0
+    container_name: mcp-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+
+  vault:
+    image: hashicorp/vault:1.16
+    container_name: mcp-vault
+    cap_add:
+      - IPC_LOCK
+    environment:
+      VAULT_DEV_ROOT_TOKEN_ID: mcp_dev_vault_token
+      VAULT_DEV_LISTEN_ADDRESS: 0.0.0.0:8200
+    ports:
+      - "8200:8200"
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.99.0
+    container_name: mcp-otel
+    volumes:
+      - ./infra/otel/config.yaml:/etc/otel/config.yaml
+    command: ["--config=/etc/otel/config.yaml"]
+    ports:
+      - "4317:4317"  # gRPC
+      - "4318:4318"  # HTTP
+
+  # ==================== MCP SERVICES ====================
+
+  discovery-engine:
+    build: ./services/01-discovery-engine
+    container_name: mcp-discovery
+    environment:
+      NEO4J_URI: bolt://neo4j:7687
+      NEO4J_USER: neo4j
+      NEO4J_PASSWORD: mcp_dev_password
+      POSTGRES_DSN: postgres://mcp:mcp_dev_password@postgres:5432/mcp
+    depends_on:
+      - neo4j
+      - postgres
+    ports:
+      - "8001:8080"
+
+  clm-service:
+    build: ./services/03-clm-service
+    container_name: mcp-clm
+    environment:
+      POSTGRES_DSN: postgres://mcp:mcp_dev_password@postgres:5432/mcp
+      VAULT_ADDR: http://vault:8200
+      VAULT_TOKEN: mcp_dev_vault_token
+    depends_on:
+      - postgres
+      - vault
+    ports:
+      - "8003:8080"
+
+  governance-engine:
+    build: ./services/07-governance-engine
+    container_name: mcp-governance
+    environment:
+      POSTGRES_DSN: postgres://mcp:mcp_dev_password@postgres:5432/mcp
+      KAFKA_BROKERS: kafka:29092
+    depends_on:
+      - postgres
+      - kafka
+    ports:
+      - "8007:8080"
+
+  agent-orchestrator:
+    build: ./services/06-agent-orchestrator
+    container_name: mcp-agents
+    environment:
+      REDIS_URL: redis://redis:6379
+      POSTGRES_DSN: postgres://mcp:mcp_dev_password@postgres:5432/mcp
+      KAFKA_BROKERS: kafka:29092
+    depends_on:
+      - redis
+      - postgres
+      - kafka
+    ports:
+      - "8006:8080"
+
+  modernization-hub:
+    build: ./services/10-modernization-hub
+    container_name: mcp-hub
+    environment:
+      NEXTAUTH_URL: http://localhost:3000
+      NEXTAUTH_SECRET: dev_secret_change_in_production
+      DISCOVERY_API: http://discovery-engine:8080
+      CLM_API: http://clm-service:8080
+      GOVERNANCE_API: http://governance-engine:8080
+      AGENT_API: http://agent-orchestrator:8080
+    depends_on:
+      - discovery-engine
+      - clm-service
+      - governance-engine
+      - agent-orchestrator
+    ports:
+      - "3000:3000"
+
+volumes:
+  postgres_data:
+  redis_data:
+  neo4j_data:
+  kafka_data:
