@@ -23,7 +23,7 @@ deny[msg] {
 # PHI must not be transmitted without encryption.
 deny[msg] {
     lower(input.data_classification) == "phi"
-    input.transmission_encrypted == false
+    not input.transmission_encrypted
     msg := "HIPAA: PHI must be transmitted over an encrypted channel"
 }
 
