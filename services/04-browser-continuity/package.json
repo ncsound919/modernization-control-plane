@@ -1,0 +1,24 @@
+{
+  "name": "@mcp/browser-continuity",
+  "version": "0.1.0",
+  "description": "Browser Continuity Engine — WASM XSLT polyfill and MV3 extension shim service",
+  "main": "dist/server.js",
+  "scripts": {
+    "start": "node dist/server.js",
+    "build": "tsc",
+    "dev": "ts-node src/server.ts"
+  },
+  "dependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.14.0",
+    "express": "^4.19.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.4.5"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
