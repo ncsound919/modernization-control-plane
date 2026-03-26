@@ -22,9 +22,9 @@ WORKDIR /app
 COPY --from=builder /clm-service /app/clm-service
 
 # Default environment — override at runtime via docker run -e or Kubernetes env vars.
-ENV POSTGRES_DSN="postgres://mcp:mcp_dev_password@localhost:5432/mcp" \
+ENV POSTGRES_DSN="postgres://user:password@postgres:5432/database" \
     VAULT_ADDR="http://localhost:8200" \
-    VAULT_TOKEN="token" \
+    VAULT_TOKEN="CHANGEME_VAULT_TOKEN" \
     PORT="8080"
 
 EXPOSE 8080
