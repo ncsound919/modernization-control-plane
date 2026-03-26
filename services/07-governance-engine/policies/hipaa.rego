@@ -14,7 +14,7 @@ allow {
 
 # PHI access requires explicit human approval.
 deny[msg] {
-    input.action == "read"
+    lower(input.action) == "read"
     lower(input.data_classification) == "phi"
     not input.human_approved
     msg := "HIPAA: PHI access requires explicit human approval"
