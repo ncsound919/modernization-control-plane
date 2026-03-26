@@ -1,0 +1,155 @@
+admin:
+  address:
+    socket_address:
+      address: 0.0.0.0
+      port_value: 9901
+
+static_resources:
+  listeners:
+    - name: sidecar_gateway_listener
+      address:
+        socket_address:
+          address: 0.0.0.0
+          port_value: 8081
+      filter_chains:
+        - filters:
+            - name: envoy.filters.network.http_connection_manager
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+                stat_prefix: sidecar_gateway
+                access_log:
+                  - name: envoy.access_loggers.stdout
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.access_loggers.stream.v3.StdoutAccessLog
+                http_filters:
+                  # JWT authentication on protected routes
+                  - name: envoy.filters.http.jwt_authn
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.jwt_authn.v3.JwtAuthentication
+                      providers:
+                        modernization_jwt:
+                          issuer: "https://auth.modernization-cp.internal"
+                          audiences:
+                            - sidecar-gateway
+                          remote_jwks:
+                            http_uri:
+                              uri: "https://auth.modernization-cp.internal/.well-known/jwks.json"
+                              cluster: jwks_cluster
+                              timeout: 5s
+                      rules:
+                        - match:
+                            prefix: "/api/v1/"
+                          requires:
+                            provider_name: modernization_jwt
+                        - match:
+                            prefix: "/health"
+                  # OpenTelemetry tracing
+                  - name: envoy.filters.http.router
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+                route_config:
+                  name: sidecar_gateway_routes
+                  virtual_hosts:
+                    - name: sidecar_gateway
+                      domains: ["*"]
+                      routes:
+                        # Health check — no auth required
+                        - match:
+                            path: "/health"
+                          route:
+                            cluster: gateway_backend
+                        # COBOL adapter
+                        - match:
+                            path: "/api/v1/adapters/cobol/execute"
+                          route:
+                            cluster: gateway_backend
+                            timeout: 30s
+                        # HL7/FHIR adapter
+                        - match:
+                            path: "/api/v1/adapters/hl7/transform"
+                          route:
+                            cluster: gateway_backend
+                            timeout: 10s
+                        # SFTP adapter
+                        - match:
+                            path: "/api/v1/adapters/sftp/transfer"
+                          route:
+                            cluster: gateway_backend
+                            timeout: 60s
+                        # Proxy — strip prefix and forward
+                        - match:
+                            prefix: "/api/v1/proxy/"
+                          route:
+                            cluster: gateway_backend
+                            timeout: 15s
+                        # Default catch-all
+                        - match:
+                            prefix: "/"
+                          route:
+                            cluster: gateway_backend
+
+  clusters:
+    # The Go gateway service itself
+    - name: gateway_backend
+      connect_timeout: 5s
+      type: STRICT_DNS
+      lb_policy: ROUND_ROBIN
+      load_assignment:
+        cluster_name: gateway_backend
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: 127.0.0.1
+                      port_value: 8080
+
+    # JWKS endpoint for JWT verification
+    - name: jwks_cluster
+      connect_timeout: 5s
+      type: LOGICAL_DNS
+      lb_policy: ROUND_ROBIN
+      load_assignment:
+        cluster_name: jwks_cluster
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: auth.modernization-cp.internal
+                      port_value: 443
+      transport_socket:
+        name: envoy.transport_sockets.tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
+          sni: auth.modernization-cp.internal
+
+    # Legacy COBOL/MQ backend (IBM MQ)
+    - name: ibmmq_backend
+      connect_timeout: 10s
+      type: STRICT_DNS
+      lb_policy: ROUND_ROBIN
+      load_assignment:
+        cluster_name: ibmmq_backend
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: ibmmq.legacy.internal
+                      port_value: 1414
+
+    # Legacy DB2 backend
+    - name: db2_backend
+      connect_timeout: 10s
+      type: STRICT_DNS
+      lb_policy: ROUND_ROBIN
+      load_assignment:
+        cluster_name: db2_backend
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: db2.legacy.internal
+                      port_value: 50000
