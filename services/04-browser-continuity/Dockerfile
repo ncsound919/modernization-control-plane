@@ -1,8 +1,8 @@
 FROM node:20-alpine AS deps
 
 WORKDIR /app
-COPY package.json ./
-RUN npm install --frozen-lockfile 2>/dev/null || npm install
+COPY package.json package-lock.json ./
+RUN npm ci
 
 # ---------------------------------------------------------------------------
 FROM deps AS builder
@@ -20,8 +20,8 @@ ENV PORT=8080
 
 WORKDIR /app
 
-COPY package.json ./
-RUN npm install --omit=dev
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev
 
 COPY --from=builder /app/dist ./dist
 

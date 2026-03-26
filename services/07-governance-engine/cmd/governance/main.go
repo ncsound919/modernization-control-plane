@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 
 	"github.com/ncsound919/modernization-control-plane/services/governance-engine/internal/api"
@@ -11,14 +12,13 @@ import (
 
 func main() {
 	port := envOr("PORT", "8080")
-	// POSTGRES_DSN and KAFKA_BROKERS are logged for observability; they will be
-	// wired into PostgreSQL / Kafka clients when those integrations are added.
+	// POSTGRES_DSN and KAFKA_BROKERS are used for future PostgreSQL / Kafka integrations.
 	postgresDSN := envOr("POSTGRES_DSN", "postgres://localhost:5432/mcp")
 	kafkaBrokers := envOr("KAFKA_BROKERS", "localhost:9092")
 
 	log.Printf("governance-engine starting")
 	log.Printf("  port=%s", port)
-	log.Printf("  postgres_dsn=%s", postgresDSN)
+	log.Printf("  postgres_dsn=%s", redactDSN(postgresDSN))
 	log.Printf("  kafka_brokers=%s", kafkaBrokers)
 
 	srv := api.NewServer()
@@ -35,4 +35,16 @@ func envOr(key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+// redactDSN returns the DSN with the password omitted, leaving only the username.
+func redactDSN(dsn string) string {
+	u, err := url.Parse(dsn)
+	if err != nil {
+		return "[redacted]"
+	}
+	if u.User != nil {
+		u.User = url.User(u.User.Username())
+	}
+	return u.String()
 }

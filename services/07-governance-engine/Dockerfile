@@ -28,7 +28,7 @@ COPY policies/ /app/policies/
 
 # Runtime environment variable defaults (override at deploy time).
 ENV PORT=8080 \
-    POSTGRES_DSN="postgres://mcp:mcp_dev_password@localhost:5432/mcp" \
+    POSTGRES_DSN="postgres://mcp:CHANGEME_DB_PASSWORD@localhost:5432/mcp" \
     KAFKA_BROKERS="localhost:9092"
 
 EXPOSE 8080

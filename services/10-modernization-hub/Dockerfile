@@ -13,7 +13,6 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 ENV NEXTAUTH_URL=http://localhost:3000
-ENV NEXTAUTH_SECRET=dev_secret_change_in_production
 ENV DISCOVERY_API=http://discovery-engine:8080
 ENV CLM_API=http://clm-service:8080
 ENV GOVERNANCE_API=http://governance-engine:8080

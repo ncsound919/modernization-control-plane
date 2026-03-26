@@ -24,7 +24,7 @@ func main() {
 		Neo4jUser:     getenv("NEO4J_USER", "neo4j"),
 		Neo4jPassword: getenv("NEO4J_PASSWORD", "password"),
 		PostgresDSN:   getenv("POSTGRES_DSN", "postgres://mcp:mcp_dev_password@localhost:5432/mcp"),
-		Port:          getenv("PORT", "8080"),
+		Port:          getenv("PORT", "8001"),
 	}
 
 	logger.Info("starting discovery-engine",

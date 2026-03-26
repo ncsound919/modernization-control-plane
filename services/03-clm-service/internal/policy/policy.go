@@ -7,6 +7,7 @@
 package policy
 
 import (
+	"fmt"
 	"log/slog"
 	"time"
 
@@ -114,7 +115,7 @@ func (e *Engine) evaluateCert(cert *models.Certificate, now time.Time) Evaluatio
 func (e *Engine) TriggerRotation(certID, triggeredBy string) (*models.CertRotationEvent, error) {
 	cert, ok := e.store.GetCertificate(certID)
 	if !ok {
-		return nil, nil
+		return nil, fmt.Errorf("certificate %s not found", certID)
 	}
 
 	eventID := e.store.NextEventID()

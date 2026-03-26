@@ -35,7 +35,11 @@ func (l *Log) Append(entry *models.AuditEntry) error {
 		prevHash = l.entries[len(l.entries)-1].Hash
 	}
 	entry.PrevHash = prevHash
-	entry.Hash = computeHash(entry, prevHash)
+	hash, err := computeHash(entry, prevHash)
+	if err != nil {
+		return fmt.Errorf("computing audit entry hash: %w", err)
+	}
+	entry.Hash = hash
 
 	l.entries = append(l.entries, entry)
 	return nil
@@ -61,7 +65,10 @@ func (l *Log) Verify() error {
 		if i > 0 {
 			prevHash = l.entries[i-1].Hash
 		}
-		expected := computeHash(e, prevHash)
+		expected, err := computeHash(e, prevHash)
+		if err != nil {
+			return fmt.Errorf("computing hash for entry %s (index %d): %w", e.ID, i, err)
+		}
 		if e.Hash != expected {
 			return fmt.Errorf("chain broken at entry %s (index %d): hash mismatch", e.ID, i)
 		}
@@ -70,7 +77,7 @@ func (l *Log) Verify() error {
 }
 
 // computeHash produces a SHA-256 digest over the entry's stable fields and prevHash.
-func computeHash(e *models.AuditEntry, prevHash string) string {
+func computeHash(e *models.AuditEntry, prevHash string) (string, error) {
 	payload := struct {
 		ID         string                 `json:"id"`
 		Timestamp  time.Time              `json:"timestamp"`
@@ -95,7 +102,10 @@ func computeHash(e *models.AuditEntry, prevHash string) string {
 		PrevHash:   prevHash,
 	}
 
-	data, _ := json.Marshal(payload)
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return "", fmt.Errorf("marshaling audit entry for hashing: %w", err)
+	}
 	sum := sha256.Sum256(data)
-	return hex.EncodeToString(sum[:])
+	return hex.EncodeToString(sum[:]), nil
 }

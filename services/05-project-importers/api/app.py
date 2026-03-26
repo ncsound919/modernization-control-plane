@@ -5,7 +5,6 @@ from datetime import datetime, timezone
 from typing import Dict, List
 
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import JSONResponse
 
 from api.models import (
     EAGLEImportRequest,

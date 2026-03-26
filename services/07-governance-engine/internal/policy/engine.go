@@ -3,6 +3,7 @@ package policy
 import (
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ncsound919/modernization-control-plane/services/governance-engine/internal/models"
@@ -13,6 +14,7 @@ import (
 // the Rego policies are expressed as equivalent Go rule-sets so the
 // service compiles and runs with the standard library only.
 type Engine struct {
+	mu       sync.RWMutex
 	policies map[string]*models.Policy
 }
 
@@ -116,6 +118,8 @@ func (e *Engine) seedBuiltins() {
 
 // ListPolicies returns all registered policies.
 func (e *Engine) ListPolicies() []*models.Policy {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
 	out := make([]*models.Policy, 0, len(e.policies))
 	for _, p := range e.policies {
 		cp := *p
@@ -126,14 +130,19 @@ func (e *Engine) ListPolicies() []*models.Policy {
 
 // AddPolicy registers a new policy.
 func (e *Engine) AddPolicy(p *models.Policy) {
-	p.CreatedAt = time.Now().UTC()
-	p.UpdatedAt = p.CreatedAt
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	now := time.Now().UTC()
+	p.CreatedAt = now
+	p.UpdatedAt = now
 	e.policies[p.ID] = p
 }
 
 // Evaluate runs all enabled policies for the given framework (or all if empty)
 // against the provided input context.
 func (e *Engine) Evaluate(req *models.PolicyEvaluationRequest) *models.PolicyDecision {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
 	decision := &models.PolicyDecision{
 		Allowed:     true,
 		EvaluatedAt: time.Now().UTC(),
@@ -259,6 +268,8 @@ func (e *Engine) evalPolicy(p *models.Policy, input map[string]interface{}) []st
 
 // ComplianceStatus returns a compliance summary for each framework.
 func (e *Engine) ComplianceStatus() []*models.ComplianceStatus {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
 	now := time.Now().UTC()
 	frameworks := []models.PolicyFramework{
 		models.FrameworkHIPAA,

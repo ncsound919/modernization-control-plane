@@ -6,6 +6,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"syscall"
@@ -26,7 +27,7 @@ func main() {
 	port := getenv("PORT", "8080")
 
 	logger.Info("starting clm-service",
-		"postgres_dsn", postgresDSN,
+		"postgres_dsn", redactDSN(postgresDSN),
 		"vault_addr", vaultAddr,
 		"port", port,
 		"note", "using in-memory store (PostgreSQL/Vault not required on startup)",
@@ -95,4 +96,16 @@ func getenv(key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+// redactDSN returns the DSN with the password omitted, leaving only the username.
+func redactDSN(dsn string) string {
+	u, err := url.Parse(dsn)
+	if err != nil {
+		return "[redacted]"
+	}
+	if u.User != nil {
+		u.User = url.User(u.User.Username())
+	}
+	return u.String()
 }
